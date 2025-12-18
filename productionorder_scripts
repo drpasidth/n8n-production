@@ -1,0 +1,154 @@
+/**
+ * Google Apps Script - Send Webhook on Form Submit
+ * 
+ * SETUP INSTRUCTIONS:
+ * 1. Open your Google Form
+ * 2. Click the three dots menu (⋮) → Script editor
+ * 3. Delete any existing code and paste this script
+ * 4. Update the WEBHOOK_URL with your n8n webhook URL
+ * 5. Save the project (Ctrl+S)
+ * 6. Run setupTrigger() once to create the form submit trigger
+ * 7. Grant necessary permissions when prompted
+ */
+
+// ============================================
+// CONFIGURATION - UPDATE THIS URL
+// ============================================
+const WEBHOOK_URL = 'https://webhook.psevolution.org/webhook/production-order';
+
+// ============================================
+// MAIN FUNCTION - Runs on form submit
+// ============================================
+function onFormSubmit(e) {
+  try {
+    // Get form response data
+    const response = e.response;
+    const itemResponses = response.getItemResponses();
+    
+    // Build payload object
+    const payload = {
+      timestamp: new Date().toISOString(),
+      responseId: response.getId(),
+      respondentEmail: response.getRespondentEmail() || 'anonymous',
+      formId: e.source.getId(),
+      formTitle: e.source.getTitle(),
+      responses: {}
+    };
+    
+    // Extract all form field responses
+    itemResponses.forEach(function(itemResponse) {
+      const question = itemResponse.getItem().getTitle();
+      const answer = itemResponse.getResponse();
+      payload.responses[question] = answer;
+    });
+    
+    // Send webhook
+    sendWebhook(payload);
+    
+    // Log success
+    Logger.log('Webhook sent successfully: ' + JSON.stringify(payload));
+    
+  } catch (error) {
+    Logger.log('Error in onFormSubmit: ' + error.toString());
+    // Optionally send error notification
+    sendErrorNotification(error);
+  }
+}
+
+// ============================================
+// SEND WEBHOOK REQUEST
+// ============================================
+function sendWebhook(payload) {
+  const options = {
+    method: 'POST',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  
+  const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
+  const responseCode = response.getResponseCode();
+  
+  if (responseCode !== 200 && responseCode !== 201) {
+    throw new Error('Webhook failed with status: ' + responseCode + ' - ' + response.getContentText());
+  }
+  
+  return response;
+}
+
+// ============================================
+// SETUP TRIGGER - Run this once manually
+// ============================================
+function setupTrigger() {
+  // Remove existing triggers to avoid duplicates
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'onFormSubmit') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+  
+  // Create new form submit trigger
+  const form = FormApp.getActiveForm();
+  ScriptApp.newTrigger('onFormSubmit')
+    .forForm(form)
+    .onFormSubmit()
+    .create();
+  
+  Logger.log('Trigger created successfully!');
+}
+
+// ============================================
+// OPTIONAL: Error notification via email
+// ============================================
+function sendErrorNotification(error) {
+  const adminEmail = Session.getActiveUser().getEmail();
+  if (adminEmail) {
+    MailApp.sendEmail({
+      to: adminEmail,
+      subject: 'Google Form Webhook Error',
+      body: 'Error occurred: ' + error.toString() + '\n\nTime: ' + new Date().toISOString()
+    });
+  }
+}
+
+// ============================================
+// TEST FUNCTION - Test webhook manually
+// ============================================
+function testWebhook() {
+  const testPayload = {
+    timestamp: new Date().toISOString(),
+    responseId: 'TEST-001',
+    respondentEmail: 'test@example.com',
+    formId: 'test-form-id',
+    formTitle: 'Test Form',
+    responses: {
+      'Product Name': 'Test Product',
+      'Quantity': '100',
+      'Priority': 'High',
+      'Due Date': '2024-12-25'
+    }
+  };
+  
+  try {
+    sendWebhook(testPayload);
+    Logger.log('Test webhook sent successfully!');
+  } catch (error) {
+    Logger.log('Test failed: ' + error.toString());
+  }
+}
+
+// ============================================
+// UTILITY: View all form responses
+// ============================================
+function viewFormResponses() {
+  const form = FormApp.getActiveForm();
+  const responses = form.getResponses();
+  
+  responses.forEach(function(response, index) {
+    Logger.log('Response ' + (index + 1) + ':');
+    response.getItemResponses().forEach(function(itemResponse) {
+      Logger.log('  ' + itemResponse.getItem().getTitle() + ': ' + itemResponse.getResponse());
+    });
+  });
+}
