@@ -1,0 +1,664 @@
+{
+  "name": "production-team",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { \n  id: item.json.id, \n  orderId: item.json.id, \n  product: item.json.product,\n  customer: item.json.customername,\n  Qty: item.json.qty,\n  duedate: item.json.duedate, \n  notified: true } }));"
+      },
+      "id": "77486ecb-69ee-41af-b468-e369f843d0f2",
+      "name": "Process Orders",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "production_orders",
+        "columns": "notified",
+        "returnFields": "=*",
+        "additionalFields": {}
+      },
+      "id": "4bc43460-7b06-4625-aa33-e13c031ac0ff",
+      "name": "Mark as Notified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        80,
+        368
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres production order"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 7
+            }
+          ]
+        }
+      },
+      "id": "79c851a9-4f33-401e-a820-a3e14ad45f33",
+      "name": "Cron1",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate Email Report for Production Orders\nconst orders = $input.all();\n\n// Format date for report\nconst reportDate = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\nfunction formatDate(dateString) {\n  if (!dateString) return 'N/A';\n  const date = new Date(dateString);\n  return date.toISOString().split('T')[0];\n}\n\n// Generate HTML content for orders\nlet htmlContent = '';\n\nif (orders.length === 0) {\n  htmlContent = '<div class=\"no-news\"><p>No pending production orders found.</p></div>';\n} else {\n  orders.forEach((item, index) => {\n    const order = item.json;\n    const statusColor = order.status === 'pending' ? '#ffc107' : \n                        order.status === 'in_progress' ? '#17a2b8' : '#28a745';\n    const dueDate = formatDate(order.duedate);\n    htmlContent += `\n      <div class=\"news-item\">\n        <div class=\"news-source\">Order #${order.Id || order.orderId}</div>\n        <div class=\"news-title\">${order.customer}</div>\n        <div class=\"news-title\">${order.product}</div>\n        <div class=\"news-description\">\n          <strong>Due Date:</strong> ${dueDate}<br>\n          <strong>Qty:</strong> ${order.Qty}<br>\n          <strong>Status:</strong> <span style=\"color: ${statusColor}; font-weight: bold;\">${order.status || 'pending'}</span>\n        </div>\n      </div>\n    `;\n  });\n}\n\nreturn [{\n  json: {\n    reportDate: reportDate,\n    articleCount: orders.length,\n    htmlContent: htmlContent\n  }\n}];"
+      },
+      "name": "Generate Email Report1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        160
+      ],
+      "id": "46963d2f-0093-477f-97f4-167c39de2b90"
+    },
+    {
+      "parameters": {
+        "fromEmail": "psevolutionth@gmail.com",
+        "toEmail": "pasidthdr@gmail.com",
+        "subject": "=Daily Production Order - {{ $json.reportDate }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <style>\n        body { \n            font-family: Arial, sans-serif; \n            line-height: 1.6; \n            color: #333; \n            max-width: 600px; \n            margin: 0 auto; \n            background-color: #f4f4f4;\n        }\n        .container {\n            background-color: white;\n            margin: 20px auto;\n            border-radius: 8px;\n            overflow: hidden;\n            box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n        }\n        .header { \n            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n            color: white; \n            padding: 30px 20px; \n            text-align: center; \n        }\n        .header h1 { \n            margin: 0; \n            font-size: 24px; \n        }\n        .stats {\n            background-color: #f8f9fa;\n            padding: 15px 20px;\n            border-bottom: 2px solid #e9ecef;\n            text-align: center;\n        }\n        .news-item { \n            margin: 0; \n            padding: 20px; \n            border-bottom: 1px solid #eee; \n        }\n        .news-item:last-child {\n            border-bottom: none;\n        }\n        .news-source { \n            color: #666; \n            font-size: 12px; \n            margin-bottom: 8px; \n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        .news-title { \n            font-weight: bold; \n            color: #2c3e50; \n            margin-bottom: 10px; \n            font-size: 18px;\n            line-height: 1.3;\n        }\n        .news-title a {\n            color: #2c3e50;\n            text-decoration: none;\n        }\n        .news-title a:hover {\n            color: #3498db;\n        }\n        .news-description { \n            margin-bottom: 12px; \n            color: #555;\n            line-height: 1.5;\n        }\n        .read-more { \n            display: inline-block;\n            background-color: #3498db;\n            color: white !important; \n            text-decoration: none;\n            padding: 8px 16px;\n            border-radius: 4px;\n            font-size: 12px;\n        }\n        .read-more:hover {\n            background-color: #2980b9;\n        }\n        .footer { \n            text-align: center; \n            padding: 20px;\n            background-color: #2c3e50;\n            color: white;\n            font-size: 12px;\n        }\n        .no-news {\n            text-align: center;\n            padding: 40px 20px;\n            color: #666;\n        }\n        @media only screen and (max-width: 600px) {\n            body { margin: 0; }\n            .container { margin: 0; border-radius: 0; }\n            .header h1 { font-size: 20px; }\n            .news-title { font-size: 16px; }\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>📰 New Production Orders</h1>\n            <p>{{ $json.reportDate }}</p>\n        </div>\n              \n        <!-- This will use the pre-generated HTML content from your previous node -->\n        <div style=\"padding: 0;\">\n            {{ $json.htmlContent }}\n        </div>\n        \n        <div class=\"footer\">\n            <p><strong></strong></p>\n            <p>Generated on {{ $json.reportDate }} by n8n workflow</p>\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "name": "Send Email Report1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        160
+      ],
+      "id": "a44cc496-4f18-4fd2-9bab-74c685d2268f",
+      "webhookId": "4de52dac-83a0-4e5e-ac46-da4bdb15e9c4",
+      "credentials": {
+        "smtp": {
+          "id": "aWjrYiNuc8kFdLXT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "production-order",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1895883f-121c-4dfb-bc88-6f28b0bd6ad9",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        432
+      ],
+      "webhookId": "production-order-webhook"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        464,
+        336
+      ],
+      "id": "d8cd5b80-ffab-43bc-99f9-b86f9c8aadc9",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "production-complete",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        608
+      ],
+      "id": "5084450d-502f-4f4a-85b9-418066098e35",
+      "name": "Webhook1",
+      "webhookId": "4a2cd34f-c227-4acd-9a71-55f7f9d9d076"
+    },
+    {
+      "parameters": {
+        "fromEmail": "psevolutionth@gmail.com",
+        "toEmail": "pasidthdr@gmail.com",
+        "subject": "=Daily Completion Order - {{ $json.reportDate }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <style>\n        body { \n            font-family: Arial, sans-serif; \n            line-height: 1.6; \n            color: #333; \n            max-width: 600px; \n            margin: 0 auto; \n            background-color: #f4f4f4;\n        }\n        .container {\n            background-color: white;\n            margin: 20px auto;\n            border-radius: 8px;\n            overflow: hidden;\n            box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n        }\n        .header { \n            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n            color: white; \n            padding: 30px 20px; \n            text-align: center; \n        }\n        .header h1 { \n            margin: 0; \n            font-size: 24px; \n        }\n        .stats {\n            background-color: #f8f9fa;\n            padding: 15px 20px;\n            border-bottom: 2px solid #e9ecef;\n            text-align: center;\n        }\n        .news-item { \n            margin: 0; \n            padding: 20px; \n            border-bottom: 1px solid #eee; \n        }\n        .news-item:last-child {\n            border-bottom: none;\n        }\n        .news-source { \n            color: #666; \n            font-size: 12px; \n            margin-bottom: 8px; \n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        .news-title { \n            font-weight: bold; \n            color: #2c3e50; \n            margin-bottom: 10px; \n            font-size: 18px;\n            line-height: 1.3;\n        }\n        .news-title a {\n            color: #2c3e50;\n            text-decoration: none;\n        }\n        .news-title a:hover {\n            color: #3498db;\n        }\n        .news-description { \n            margin-bottom: 12px; \n            color: #555;\n            line-height: 1.5;\n        }\n        .read-more { \n            display: inline-block;\n            background-color: #3498db;\n            color: white !important; \n            text-decoration: none;\n            padding: 8px 16px;\n            border-radius: 4px;\n            font-size: 12px;\n        }\n        .read-more:hover {\n            background-color: #2980b9;\n        }\n        .footer { \n            text-align: center; \n            padding: 20px;\n            background-color: #2c3e50;\n            color: white;\n            font-size: 12px;\n        }\n        .no-news {\n            text-align: center;\n            padding: 40px 20px;\n            color: #666;\n        }\n        @media only screen and (max-width: 600px) {\n            body { margin: 0; }\n            .container { margin: 0; border-radius: 0; }\n            .header h1 { font-size: 20px; }\n            .news-title { font-size: 16px; }\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>📰 New Production Orders</h1>\n            <p>{{ $json.reportDate }}</p>\n        </div>\n              \n        <!-- This will use the pre-generated HTML content from your previous node -->\n        <div style=\"padding: 0;\">\n            {{ $json.htmlContent }}\n        </div>\n        \n        <div class=\"footer\">\n            <p><strong></strong></p>\n            <p>Generated on {{ $json.reportDate }} by n8n workflow</p>\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "name": "Send Email Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        288,
+        576
+      ],
+      "id": "df50d349-12fc-4839-b07f-a8f9c629da36",
+      "webhookId": "4de52dac-83a0-4e5e-ac46-da4bdb15e9c4",
+      "credentials": {
+        "smtp": {
+          "id": "aWjrYiNuc8kFdLXT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        480,
+        576
+      ],
+      "id": "09bc33a9-637d-4010-8352-70f7a17de5d4",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code Node: Process Form Data for PostgreSQL\n// Place this code in a Code node after the Webhook node\n\nconst webhookData = $input.first().json.body;\n\n// Extract and format data for PostgreSQL insert\nconst record = {\n  productionorder: webhookData.responses[\"Production Order\"],\n  qtyproduced: parseInt(webhookData.responses[\"Quantity Produced\"], 10) || 0,\n  qtygood: parseInt(webhookData.responses[\"Quantity Good\"], 10) || 0,\n  qtydefect: parseInt(webhookData.responses[\"Quantity Defect\"], 10) || 0,\n  finisheddate: webhookData.responses[\"Finished Date\"],\n  workername: webhookData.responses[\"Employee Name\"] || null,\n  notes: webhookData.responses[\"Notes\"] || null,\n  status: 'completed',\n  updated_at: new Date().toISOString()\n};\n\nreturn [{ json: record }];\n"
+      },
+      "id": "97cb9e12-36d9-4f83-bcef-77a31502fc53",
+      "name": "Process Form Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "table": "production_orders",
+        "columns": "productionorder,product,qty,status,duedate,customername",
+        "additionalFields": {}
+      },
+      "id": "45d20eab-834c-4bcb-b4f7-02bb1d1036d7",
+      "name": "New Order",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres production order"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "production_orders",
+        "updateKey": "productionorder",
+        "columns": "qtyproduced,qtygood,qtydefect,finisheddate,status,workername,notes",
+        "additionalFields": {}
+      },
+      "id": "f2a8c743-4017-4908-b1ff-9565b99e95b1",
+      "name": "Production Complete",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        608
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres production order"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM production_orders WHERE status = 'pending' AND notified = FALSE",
+        "additionalFields": {}
+      },
+      "id": "95962b14-1b97-4e93-a110-c6eabca8fc3b",
+      "name": "Check Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        208
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres production order"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { \n  id: item.json.id, \n  productionorder: item.json.productionorder, \n  product: item.json.product,\n  customer: item.json.customername,\n  qtyproduced: item.json.qtyproduced,\n  qtygood: item.json.qtygood,\n  qtydefect: item.json.qtydefect,\n  finishdate: item.json.finisheddate, \n  worker: item.json.workername,\n  notes: item.json.notes,\n  notified: true } }));"
+      },
+      "id": "26112e09-e0bb-4b5c-849d-7327485f86ef",
+      "name": "Process Completion",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate Email Report for Production Orders\nconst orders = $input.all()\n\n// Format date for report\nconst reportDate = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\nfunction formatDate(dateString) {\n  if (!dateString) return 'N/A';\n  const date = new Date(dateString);\n  return date.toISOString().split('T')[0];\n}\n\n// Generate HTML content for orders\nlet htmlContent = '';\n\nif (orders.length === 0) {\n  htmlContent = '<div class=\"no-news\"><p>No pending production orders found.</p></div>';\n} else {\n  orders.forEach((item, index) => {\n    const order = item.json;\n    const statusColor = order.status === 'pending' ? '#ffc107' : \n                        order.status === 'in_progress' ? '#17a2b8' : '#28a745';\n    const dueDate = formatDate(order.duedate);\n    htmlContent += `\n      <div class=\"news-item\">\n        <div class=\"news-source\"><strong>Production Order:</strong> #${order.Id || order.productionorder}</div>\n        <div class=\"news-title\"><strong>ชื่อลูกค้า:</strong>\n${order.customername}</div>\n        <div class=\"news-title\"><strong>รหัสสินค้า:</strong>${order.product}</div>\n        <div class=\"news-description\">\n          <strong>วันผลิตเสร็จ:</strong> ${order.finishdate}<br>\n          <strong>จำนวนผลิตได้:</strong> ${order.qtyproduced}<br>\n          <strong>จำนวนผลิตดี:</strong> ${order.qtygood}<br>\n          <strong>จำนวนของเสีย:</strong> ${order.qtydefect}<br>\n          <strong>ชื่อพนักงาน:</strong> ${order.worker}<br>\n          <strong>หมายเหตุ:</strong> ${order.notes}<br>\n          <strong>Status:</strong> <span style=\"color: ${statusColor}; font-weight: bold;\">${order.status || 'Completed'}</span>\n        </div>\n      </div>\n    `;\n  });\n}\n\nreturn [{\n  json: {\n    reportDate: reportDate,\n    articleCount: orders.length,\n    htmlContent: htmlContent\n  }\n}];"
+      },
+      "name": "Generate Email Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        752
+      ],
+      "id": "49eca63e-26d8-46c1-aba1-2d61fcfe1a19"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code Node: Process Form Data for PostgreSQL\n// Place this code in a Code node after the Webhook node\n\nconst webhookData = $input.first().json.body;\n\n// Extract and format data for PostgreSQL insert\nconst record = {\n  productionorder: webhookData.responses[\"Production Order\"],\n  product: webhookData.responses[\"Product Name\"],\n  qty: parseInt(webhookData.responses[\"Quantity\"], 10),\n  duedate: webhookData.responses[\"Due Date\"],\n  customername: webhookData.responses[\"Customer Name\"],\n  form_response_id: webhookData.responseId,\n  form_id: webhookData.formId,\n  form_title: webhookData.formTitle,\n  respondent_email: webhookData.respondentEmail,\n  submitted_at: webhookData.timestamp,\n  created_at: new Date().toISOString(),\n  status: 'pending'\n};\n\nreturn [{ json: record }];\n"
+      },
+      "id": "d74be3af-adbb-4b46-b21f-5c7c6660ead6",
+      "name": "Process Form Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "production_orders",
+          "mode": "list",
+          "cachedResultName": "production_orders"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "productionorder",
+              "value": "={{ $json.productionorder || 'PO-111'}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -368,
+        832
+      ],
+      "id": "bcba87a9-1b26-4688-823c-90e9243fc181",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres production order"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -64,
+        736
+      ],
+      "id": "dbb02c91-dc7c-4786-94c8-dd038275df45",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "87c2b5b8-16f0-4baa-a050-34cb137121cb",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "aa9a6bf8-60a8-4480-bcff-273516a6c7b5",
+              "name": "product",
+              "value": "={{ $json.product }}",
+              "type": "string"
+            },
+            {
+              "id": "04b2ba2a-384b-4566-9814-9cc446215952",
+              "name": "qty",
+              "value": "={{ $json.qty }}",
+              "type": "string"
+            },
+            {
+              "id": "3c0d8375-3648-434f-9562-0df91519d932",
+              "name": "qtyproduced",
+              "value": "={{ $json.qtyproduced }}",
+              "type": "string"
+            },
+            {
+              "id": "9b4d030c-a11d-4e72-b737-3bdea355b14c",
+              "name": "duedate",
+              "value": "={{ $json.duedate }}",
+              "type": "string"
+            },
+            {
+              "id": "d793fbef-284f-43e1-98ee-ab7db95821f9",
+              "name": "customername",
+              "value": "={{ $json.customername }}",
+              "type": "string"
+            },
+            {
+              "id": "ad0f864c-4303-43a3-b530-2e6f8ea8566c",
+              "name": "qtygood",
+              "value": "={{ $json.qtygood }}",
+              "type": "string"
+            },
+            {
+              "id": "f9169b35-f0ef-4990-8ac3-d3106743634a",
+              "name": "qtydefect",
+              "value": "={{ $json.qtydefect }}",
+              "type": "string"
+            },
+            {
+              "id": "30f2532f-3e27-44da-9867-d5e49515943c",
+              "name": "workername",
+              "value": "={{ $json.workername }}",
+              "type": "string"
+            },
+            {
+              "id": "4bcfedd6-3337-4758-905d-038607cc501a",
+              "name": "notes",
+              "value": "={{ $json.notes }}",
+              "type": "string"
+            },
+            {
+              "id": "12493a47-935c-43ca-948a-d8c51c45e95f",
+              "name": "productionorder",
+              "value": "={{ $json.productionorder }}",
+              "type": "string"
+            },
+            {
+              "id": "ff58c93d-d7ad-4ea0-88f3-dfdb424f1bb9",
+              "name": "finisheddate",
+              "value": "={{ $json.finisheddate }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        112,
+        768
+      ],
+      "id": "b3f44226-0e3b-400a-98ca-48915cbf6159",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Process Orders": {
+      "main": [
+        [
+          {
+            "node": "Mark as Notified",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Email Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron1": {
+      "main": [
+        [
+          {
+            "node": "Check Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Report1": {
+      "main": [
+        [
+          {
+            "node": "Send Email Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Form Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Notified": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Report1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Process Form Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Report": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Form Complete": {
+      "main": [
+        [
+          {
+            "node": "Production Complete",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Order": {
+      "main": [
+        [
+          {
+            "node": "Process Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production Complete": {
+      "main": [
+        [
+          {
+            "node": "Process Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Database": {
+      "main": [
+        [
+          {
+            "node": "Process Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Completion": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Report": {
+      "main": [
+        [
+          {
+            "node": "Send Email Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Form Data": {
+      "main": [
+        [
+          {
+            "node": "New Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ca52bdbf-4fc2-4615-b7eb-3c19fc747d0a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4bb4a68fdd357fb01031eb3ecc86b085d8269ff27ce26b5cf53f4afa0ad6fb17"
+  },
+  "id": "U7oJ1ZJT6bSugFwZ",
+  "tags": []
+}
